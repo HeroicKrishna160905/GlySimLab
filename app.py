@@ -49,37 +49,39 @@ meal_size = st.sidebar.slider(
 )
 
 # PID parameters (only for T1DM mode)
+# PID parameters (only for T1DM mode)
 if model_type == "T1DM + PID Control":
     st.sidebar.header("PID Parameters")
 
     P = st.sidebar.slider(
-    "P Gain",
-    min_value=0.0001,
-    max_value=0.02,
-    value=0.001,
-    step=0.0001,
-    format="%.4f"
-)
+        "P Gain",
+        min_value=0.0001,
+        max_value=0.02,
+        value=0.001,
+        step=0.0001,
+        format="%.4f"
+    )
 
-I = st.sidebar.slider(
-    "I Gain",
-    min_value=0.000001,
-    max_value=0.0005,
-    value=0.00001,
-    step=0.000001,
-    format="%.6f"
-)
+    I = st.sidebar.slider(
+        "I Gain",
+        min_value=0.000001,
+        max_value=0.0005,
+        value=0.00001,
+        step=0.000001,
+        format="%.6f"
+    )
 
-D = st.sidebar.slider(
-    "D Gain",
-    min_value=0.0,
-    max_value=0.01,
-    value=0.0,
-    step=0.0001,
-    format="%.4f"
-)
+    D = st.sidebar.slider(
+        "D Gain",
+        min_value=0.0,
+        max_value=0.01,
+        value=0.0,
+        step=0.0001,
+        format="%.4f"
+    )
 
     target = st.sidebar.slider("Target Glucose", 80, 180, 140)
+
 
 
 # ---------------------------------------------------------
