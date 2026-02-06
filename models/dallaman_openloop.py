@@ -219,3 +219,14 @@ def plot_solution(sol):
 if __name__ == '__main__':
     sol, p, x0 = run_simulation((0, 600), dt=0.5)  # simulate 10 hours
     plot_solution(sol)
+
+
+def extract_states(sol):
+    t = sol.t
+    Gp = sol.y[0, :]
+    Gt = sol.y[1, :]
+    Ip = sol.y[3, :]
+    Ipo = sol.y[10, :]
+
+    return t, Gp, Gt, Ip, Ipo
+
