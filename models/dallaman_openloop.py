@@ -122,7 +122,7 @@ def dallaman_ode(t, x, p):
 
     return np.array([dGp, dGt, dIl, dIp, dQsto1, dQsto2, dQgut, dI1, dId, dX, dIpo, dY])
 
-def run_simulation(t_span=(0, 600), dt=0.1):
+def run_simulation(t_span=(0, 600), dt=0.1, meal_size=78000.0):
     # parameters
     p = dict(
         V_G=1.88,
@@ -169,19 +169,20 @@ def run_simulation(t_span=(0, 600), dt=0.1):
 
     # initial states ( we use named 12 states)
     x0 = np.array([
-        178.0,  # Gp
-        135.0,  # Gt
-        4.5,    # Il
-        1.25,   # Ip
-        78000.0,# Q_sto1
-        0.0,    # Q_sto2
-        0.0,    # Q_gut
-        25.0,   # I1
-        25.0,   # Id
-        0.0,    # X
-        3.6,    # I_po
-        0.0     # Y
+    178.0,
+    135.0,
+    4.5,
+    1.25,
+    meal_size,   # Q_sto1 now controlled externally
+    0.0,
+    0.0,
+    25.0,
+    25.0,
+    0.0,
+    3.6,
+    0.0
     ])
+
 
     t_eval = np.arange(t_span[0], t_span[1] + dt, dt)
 
