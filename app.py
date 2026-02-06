@@ -1,103 +1,170 @@
 import streamlit as st
+import numpy as np
 import matplotlib.pyplot as plt
 
+# Open-loop model
 from models.dallaman_openloop import run_simulation, extract_states
 
-# -------------------------------------------------
-# PAGE SETUP
-# -------------------------------------------------
-st.set_page_config(page_title="GlySimLab - Dalla Man Simulator", layout="wide")
+# T1DM closed-loop system
+from models.dallaman_t1dm import dallaman_t1dm_ode
+from simulator.closed_loop import simulate_t1dm_closed_loop
+from controllers.pid import PIDController
+
+
+# ---------------------------------------------------------
+# PAGE CONFIG
+# ---------------------------------------------------------
+st.set_page_config(page_title="GlySimLab", layout="wide")
 
 st.title("GlySimLab")
-st.subheader("Interactive Dalla Man Glucose–Insulin Model")
+st.subheader("Dalla Man Glucose–Insulin Simulation Platform")
 
-st.write(
-    "Simulate physiological glucose–insulin dynamics using the Dalla Man model. "
-    "Adjust meal size and simulation settings to observe system response."
+
+# ---------------------------------------------------------
+# SIDEBAR CONTROLS
+# ---------------------------------------------------------
+st.sidebar.header("Model Selection")
+
+model_type = st.sidebar.selectbox(
+    "Choose Model",
+    [
+        "Open Loop (Normal Physiology)",
+        "T1DM + PID Control"
+    ]
 )
 
-# -------------------------------------------------
-# SIDEBAR CONTROLS
-# -------------------------------------------------
 st.sidebar.header("Simulation Settings")
 
-sim_time = st.sidebar.slider(
-    "Simulation Time (minutes)",
-    min_value=100,
-    max_value=1000,
-    value=600,
-    step=50
-)
+sim_time = st.sidebar.slider("Simulation Time (minutes)", 100, 1000, 600, 50)
+dt = st.sidebar.slider("Time Step", 0.05, 1.0, 0.1, 0.05)
 
-dt = st.sidebar.slider(
-    "Time Step (dt)",
-    min_value=0.1,
-    max_value=1.0,
-    value=0.5,
-    step=0.1
-)
-
-st.sidebar.header("Meal Input")
+st.sidebar.header("Meal Settings")
 
 meal_size = st.sidebar.slider(
-    "Meal Carbohydrate Load (Q_sto1)",
+    "Meal Carbohydrate Load",
     min_value=0,
     max_value=120000,
     value=78000,
     step=1000
 )
 
-# -------------------------------------------------
+# PID parameters (only for T1DM mode)
+if model_type == "T1DM + PID Control":
+    st.sidebar.header("PID Parameters")
+
+    P = st.sidebar.slider("P Gain", 0.0, 0.05, 0.001, 0.0005)
+    I = st.sidebar.slider("I Gain", 0.0, 0.001, 0.00001, 0.00001)
+    D = st.sidebar.slider("D Gain", 0.0, 0.01, 0.0, 0.0001)
+    target = st.sidebar.slider("Target Glucose", 80, 180, 140)
+
+
+# ---------------------------------------------------------
 # RUN SIMULATION
-# -------------------------------------------------
+# ---------------------------------------------------------
 if st.button("Run Simulation"):
 
-    sol, p, x0 = run_simulation(
-        t_span=(0, sim_time),
-        dt=dt,
-        meal_size=meal_size
-    )
+    # =====================================================
+    # OPEN LOOP MODEL
+    # =====================================================
+    if model_type == "Open Loop (Normal Physiology)":
 
-    t, Gp, Gt, Ip, Ipo = extract_states(sol)
+        sol, p, x0 = run_simulation(
+            t_span=(0, sim_time),
+            dt=dt,
+            meal_size=meal_size
+        )
 
-    # -------------------------------------------------
-    # LAYOUT
-    # -------------------------------------------------
-    col1, col2 = st.columns(2)
+        t, Gp, Gt, Ip, Ipo = extract_states(sol)
 
-    # --------- Glucose Plot ---------
-    with col1:
-        st.subheader("Glucose Dynamics")
+        col1, col2 = st.columns(2)
 
-        fig1, ax1 = plt.subplots()
-        ax1.plot(t, Gp, label="Plasma Glucose (Gp)")
-        ax1.plot(t, Gt, label="Tissue Glucose (Gt)")
-        ax1.set_xlabel("Time (min)")
-        ax1.set_ylabel("Glucose (model units)")
-        ax1.legend()
-        ax1.grid(True)
+        # Glucose plot
+        with col1:
+            st.subheader("Glucose Dynamics")
 
-        st.pyplot(fig1)
+            fig1, ax1 = plt.subplots()
+            ax1.plot(t, Gp, label="Plasma Glucose (Gp)")
+            ax1.plot(t, Gt, label="Tissue Glucose (Gt)")
+            ax1.set_xlabel("Time (min)")
+            ax1.set_ylabel("Glucose")
+            ax1.legend()
+            ax1.grid(True)
 
-    # --------- Insulin Plot ---------
-    with col2:
-        st.subheader("Insulin Dynamics")
+            st.pyplot(fig1)
 
-        fig2, ax2 = plt.subplots()
-        ax2.plot(t, Ip, label="Plasma Insulin (Ip)")
-        ax2.plot(t, Ipo, label="Portal Insulin (Ipo)")
-        ax2.set_xlabel("Time (min)")
-        ax2.set_ylabel("Insulin (model units)")
-        ax2.legend()
-        ax2.grid(True)
+        # Insulin plot
+        with col2:
+            st.subheader("Insulin Dynamics")
 
-        st.pyplot(fig2)
+            fig2, ax2 = plt.subplots()
+            ax2.plot(t, Ip, label="Plasma Insulin (Ip)")
+            ax2.plot(t, Ipo, label="Portal Insulin (Ipo)")
+            ax2.set_xlabel("Time (min)")
+            ax2.set_ylabel("Insulin")
+            ax2.legend()
+            ax2.grid(True)
 
-    # -------------------------------------------------
-    # QUICK INFO PANEL
-    # -------------------------------------------------
-    st.markdown("---")
-    st.subheader("Simulation Info")
+            st.pyplot(fig2)
 
-    st.write(f"Meal size used: {meal_size}")
-    st.write(f"Simulation duration: {sim_time} minutes")
+    # =====================================================
+    # T1DM CLOSED LOOP MODEL
+    # =====================================================
+    else:
+
+        # Create PID controller
+        pid = PIDController(P=P, I=I, D=D, target=target)
+
+        # Parameter set (reuse same parameters as open-loop)
+        _, p, _ = run_simulation((0, 1))
+
+        # Initial state for T1DM
+        x0 = np.array([
+            178.0,        # Gp
+            135.0,        # Gt
+            0.0,          # Il
+            0.0,          # Ip
+            meal_size,    # Qsto1
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,          # Isc1
+            0.0           # Isc2
+        ])
+
+        t, glucose, insulin = simulate_t1dm_closed_loop(
+            pid, p, x0, T=sim_time, dt=dt
+        )
+
+        col1, col2 = st.columns(2)
+
+        # Glucose plot
+        with col1:
+            st.subheader("Glucose (Closed Loop)")
+
+            fig1, ax1 = plt.subplots()
+            ax1.plot(t, glucose, label="Plasma Glucose")
+            ax1.axhline(target, linestyle="--", label="Target")
+            ax1.set_xlabel("Time (min)")
+            ax1.set_ylabel("Glucose")
+            ax1.legend()
+            ax1.grid(True)
+
+            st.pyplot(fig1)
+
+        # Insulin infusion plot
+        with col2:
+            st.subheader("Insulin Infusion (PID Output)")
+
+            fig2, ax2 = plt.subplots()
+            ax2.plot(t, insulin, label="Insulin Infusion Rate")
+            ax2.set_xlabel("Time (min)")
+            ax2.set_ylabel("Insulin Input")
+            ax2.legend()
+            ax2.grid(True)
+
+            st.pyplot(fig2)
+
+        st.markdown("---")
+        st.success("Closed-loop artificial pancreas simulation running.")
